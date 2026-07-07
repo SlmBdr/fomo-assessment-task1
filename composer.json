@@ -1,0 +1,13 @@
+{
+    "name": "fomo/assessment-test-task1",
+    "description": "Task 1 Online Store API for Fullstack Engineer Assessment",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=7.4"
+    }
+}
