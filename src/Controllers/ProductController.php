@@ -7,9 +7,6 @@ use PDO;
 use Exception;
 
 class ProductController {
-    /**
-     * GET /products - List all products
-     */
     public function index() {
         $db = Database::getConnection();
         $stmt = $db->query("SELECT id, name, price, inventory FROM products ORDER BY id ASC");
@@ -19,9 +16,6 @@ class ProductController {
         echo json_encode($products);
     }
 
-    /**
-     * GET /products/{id} - Get a specific product
-     */
     public function show(int $id) {
         $db = Database::getConnection();
         $stmt = $db->prepare("SELECT id, name, price, inventory FROM products WHERE id = :id");
@@ -38,9 +32,6 @@ class ProductController {
         echo json_encode($product);
     }
 
-    /**
-     * POST /products - Create a new product
-     */
     public function create() {
         header('Content-Type: application/json');
         $input = json_decode(file_get_contents('php://input'), true);
@@ -88,14 +79,10 @@ class ProductController {
         ]);
     }
 
-    /**
-     * PUT /products/{id} - Update a product
-     */
     public function update(int $id) {
         header('Content-Type: application/json');
         $db = Database::getConnection();
         
-        // Check if product exists
         $stmt = $db->prepare("SELECT id FROM products WHERE id = :id");
         $stmt->execute(['id' => $id]);
         if (!$stmt->fetch()) {
@@ -111,7 +98,6 @@ class ProductController {
             return;
         }
 
-        // Build update statement dynamically based on provided fields
         $fields = [];
         $params = ['id' => $id];
 
@@ -158,7 +144,6 @@ class ProductController {
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
 
-        // Fetch updated product
         $stmt = $db->prepare("SELECT id, name, price, inventory FROM products WHERE id = :id");
         $stmt->execute(['id' => $id]);
         $updatedProduct = $stmt->fetch();
@@ -169,14 +154,10 @@ class ProductController {
         ]);
     }
 
-    /**
-     * DELETE /products/{id} - Delete a product
-     */
     public function delete(int $id) {
         header('Content-Type: application/json');
         $db = Database::getConnection();
 
-        // Check if product exists
         $stmt = $db->prepare("SELECT id FROM products WHERE id = :id");
         $stmt->execute(['id' => $id]);
         if (!$stmt->fetch()) {

@@ -1,10 +1,8 @@
 <?php
 
-// 1. Setup Autoloading
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 } else {
-    // Custom autoloader fallback
     spl_autoload_register(function ($class) {
         $prefix = 'App\\';
         $base_dir = __DIR__ . '/../src/';
@@ -33,17 +31,15 @@ try {
     exit(1);
 }
 
-// 1. Re-seed/create a specific product for the race condition test
 echo "Initializing test product with limited stock...\n";
 try {
-    // Clear existing orders/items so we start fresh
     $db->exec("TRUNCATE order_items, orders, products RESTART IDENTITY CASCADE");
 
     $stmt = $db->prepare("INSERT INTO products (name, price, inventory) VALUES (:name, :price, :inventory) RETURNING id");
     $stmt->execute([
         'name' => 'Flash Sale Phone',
         'price' => 99.99,
-        'inventory' => 5 // Only 5 in stock!
+        'inventory' => 5
     ]);
     $product = $stmt->fetch();
     $productId = $product['id'];
@@ -53,9 +49,8 @@ try {
     exit(1);
 }
 
-// 2. Setup parallel requests using curl_multi
 $apiUrl = "http://localhost:8000/orders";
-$numRequests = 20; // 20 concurrent buyers trying to get the 5 items
+$numRequests = 20;
 $mh = curl_multi_init();
 $handles = [];
 
@@ -83,14 +78,12 @@ for ($i = 1; $i <= $numRequests; $i++) {
     $handles[] = $ch;
 }
 
-// Execute parallel requests
 echo "Sending requests concurrently (Flash sale starts!)...\n";
 $running = null;
 do {
     curl_multi_exec($mh, $running);
 } while ($running > 0);
 
-// Read responses
 $successCount = 0;
 $failureCount = 0;
 $statusCodes = [];
@@ -118,14 +111,11 @@ foreach ($statusCodes as $code => $count) {
 echo "Total Successes (HTTP 201): {$successCount}\n";
 echo "Total Failures (Others): {$failureCount}\n";
 
-// 3. Query DB to verify assertions
 echo "\n--- Database Verification ---\n";
-// Fetch current inventory
 $stmt = $db->prepare("SELECT inventory FROM products WHERE id = :id");
 $stmt->execute(['id' => $productId]);
 $finalInventory = (int)$stmt->fetchColumn();
 
-// Fetch total orders and items
 $totalOrders = (int)$db->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 $totalOrderItems = (int)$db->query("SELECT COUNT(*) FROM order_items WHERE product_id = {$productId}")->fetchColumn();
 
@@ -133,7 +123,6 @@ echo "Final Product Inventory: {$finalInventory}\n";
 echo "Total Orders Created: {$totalOrders}\n";
 echo "Total Order Items Created: {$totalOrderItems}\n";
 
-// 4. Assert correctness
 $testPassed = true;
 
 if ($finalInventory !== 0) {

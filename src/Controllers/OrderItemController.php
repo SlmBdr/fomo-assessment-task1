@@ -7,9 +7,6 @@ use PDO;
 use Exception;
 
 class OrderItemController {
-    /**
-     * GET /order-items - List all order items
-     */
     public function index() {
         header('Content-Type: application/json');
         try {
@@ -22,7 +19,6 @@ class OrderItemController {
             ");
             $items = $stmt->fetchAll();
             
-            // Format types
             foreach ($items as &$item) {
                 $item['id'] = (int)$item['id'];
                 $item['order_id'] = (int)$item['order_id'];
@@ -38,9 +34,6 @@ class OrderItemController {
         }
     }
 
-    /**
-     * GET /order-items/{id} - Get specific order item details
-     */
     public function show(int $id) {
         header('Content-Type: application/json');
         try {
@@ -73,9 +66,6 @@ class OrderItemController {
         }
     }
 
-    /**
-     * POST /order-items - Add item to an existing order (concurrency safe)
-     */
     public function create() {
         header('Content-Type: application/json');
         try {
@@ -94,7 +84,6 @@ class OrderItemController {
             $db = Database::getConnection();
             $db->beginTransaction();
 
-            // 1. Check if Order exists
             $orderStmt = $db->prepare("SELECT id FROM orders WHERE id = :id");
             $orderStmt->execute(['id' => $orderId]);
             if (!$orderStmt->fetch()) {
@@ -104,7 +93,6 @@ class OrderItemController {
                 return;
             }
 
-            // 2. Lock product row to prevent race conditions on stock check
             $productStmt = $db->prepare("SELECT id, name, price, inventory FROM products WHERE id = :id FOR UPDATE");
             $productStmt->execute(['id' => $productId]);
             $product = $productStmt->fetch();
@@ -126,7 +114,6 @@ class OrderItemController {
 
             $price = (float)$product['price'];
 
-            // 3. Insert order item
             $insertStmt = $db->prepare("
                 INSERT INTO order_items (order_id, product_id, quantity, price) 
                 VALUES (:order_id, :product_id, :quantity, :price) 
@@ -140,7 +127,6 @@ class OrderItemController {
             ]);
             $newItem = $insertStmt->fetch();
 
-            // 4. Deduct product inventory
             $updateProductStmt = $db->prepare("UPDATE products SET inventory = :inventory WHERE id = :id");
             $updateProductStmt->execute([
                 'inventory' => $availableStock - $quantity,
@@ -172,9 +158,6 @@ class OrderItemController {
         }
     }
 
-    /**
-     * PUT /order-items/{id} - Update item quantity in an order (concurrency safe)
-     */
     public function update(int $id) {
         header('Content-Type: application/json');
         try {
@@ -190,7 +173,6 @@ class OrderItemController {
             $db = Database::getConnection();
             $db->beginTransaction();
 
-            // 1. Get current order item details
             $itemStmt = $db->prepare("SELECT order_id, product_id, quantity FROM order_items WHERE id = :id");
             $itemStmt->execute(['id' => $id]);
             $item = $itemStmt->fetch();
@@ -206,7 +188,6 @@ class OrderItemController {
             $oldQuantity = (int)$item['quantity'];
             $quantityDiff = $newQuantity - $oldQuantity;
 
-            // 2. Lock product row to prevent race conditions on stock adjustment
             $productStmt = $db->prepare("SELECT id, name, inventory FROM products WHERE id = :id FOR UPDATE");
             $productStmt->execute(['id' => $productId]);
             $product = $productStmt->fetch();
@@ -220,7 +201,6 @@ class OrderItemController {
 
             $availableStock = (int)$product['inventory'];
 
-            // If we are increasing quantity, verify enough stock
             if ($quantityDiff > 0 && $availableStock < $quantityDiff) {
                 $db->rollBack();
                 http_response_code(422);
@@ -228,23 +208,20 @@ class OrderItemController {
                 return;
             }
 
-            // 3. Update order item quantity
             $updateItemStmt = $db->prepare("UPDATE order_items SET quantity = :quantity WHERE id = :id");
             $updateItemStmt->execute([
                 'quantity' => $newQuantity,
                 'id' => $id
             ]);
 
-            // 4. Adjust product stock
             $updateProductStmt = $db->prepare("UPDATE products SET inventory = :inventory WHERE id = :id");
             $updateProductStmt->execute([
-                'inventory' => $availableStock - $quantityDiff, // if quantityDiff is negative, inventory increases (double negative = positive)
+                'inventory' => $availableStock - $quantityDiff,
                 'id' => $productId
             ]);
 
             $db->commit();
 
-            // Fetch and return the updated order item details
             $this->show($id);
 
         } catch (Exception $e) {
@@ -257,16 +234,12 @@ class OrderItemController {
         }
     }
 
-    /**
-     * DELETE /order-items/{id} - Remove item from order and return stock to product (concurrency safe)
-     */
     public function delete(int $id) {
         header('Content-Type: application/json');
         try {
             $db = Database::getConnection();
             $db->beginTransaction();
 
-            // 1. Get current order item details
             $itemStmt = $db->prepare("SELECT order_id, product_id, quantity FROM order_items WHERE id = :id");
             $itemStmt->execute(['id' => $id]);
             $item = $itemStmt->fetch();
@@ -281,13 +254,11 @@ class OrderItemController {
             $productId = $item['product_id'];
             $quantity = (int)$item['quantity'];
 
-            // 2. Lock product row to return stock
             $productStmt = $db->prepare("SELECT id, inventory FROM products WHERE id = :id FOR UPDATE");
             $productStmt->execute(['id' => $productId]);
             $product = $productStmt->fetch();
 
             if ($product) {
-                // If product still exists, return stock
                 $availableStock = (int)$product['inventory'];
                 $updateProductStmt = $db->prepare("UPDATE products SET inventory = :inventory WHERE id = :id");
                 $updateProductStmt->execute([
@@ -296,7 +267,6 @@ class OrderItemController {
                 ]);
             }
 
-            // 3. Delete order item
             $deleteStmt = $db->prepare("DELETE FROM order_items WHERE id = :id");
             $deleteStmt->execute(['id' => $id]);
 

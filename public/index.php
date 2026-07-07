@@ -1,10 +1,8 @@
 <?php
 
-// 1. Setup Autoloading
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 } else {
-    // Custom autoloader fallback if composer hasn't been run
     spl_autoload_register(function ($class) {
         $prefix = 'App\\';
         $base_dir = __DIR__ . '/../src/';
@@ -22,19 +20,14 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
 
 use App\Database;
 
-// 2. Load Environment Variables
 try {
     Database::loadEnv();
 } catch (Exception $e) {
-    // Fail silently if .env is missing or invalid, database connection will handle it
 }
 
-// 3. Simple Router Configuration
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Handle potential subdirectory path prefixes (like if running in a subdirectory of a web root)
-// If it's running via `php -S`, $uri starts with /
 $routes = [
     'GET' => [
         '#^/products$#' => ['App\Controllers\ProductController', 'index'],
@@ -61,14 +54,11 @@ $routes = [
     ]
 ];
 
-// Check if method exists in route definition
 if (isset($routes[$method])) {
     foreach ($routes[$method] as $pattern => $handler) {
         if (preg_match($pattern, $uri, $matches)) {
-            // Remove full match from array
             array_shift($matches);
             
-            // Re-type integer captures
             $params = array_map(function($val) {
                 return is_numeric($val) ? (int)$val : $val;
             }, $matches);
@@ -89,7 +79,6 @@ if (isset($routes[$method])) {
     }
 }
 
-// 4. Route Not Found
 header('Content-Type: application/json');
 http_response_code(404);
 echo json_encode([

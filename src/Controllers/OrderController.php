@@ -14,19 +14,14 @@ class OrderController {
         $this->orderService = new OrderService();
     }
 
-    /**
-     * GET /orders - List all orders (with items)
-     */
     public function index() {
         header('Content-Type: application/json');
         try {
             $db = Database::getConnection();
             
-            // Fetch all orders
             $stmt = $db->query("SELECT id, customer_name, created_at FROM orders ORDER BY id DESC");
             $orders = $stmt->fetchAll();
 
-            // Fetch order items and map them
             $stmtItems = $db->query("
                 SELECT oi.id, oi.order_id, oi.product_id, p.name as product_name, oi.quantity, oi.price 
                 FROM order_items oi 
@@ -35,11 +30,10 @@ class OrderController {
             ");
             $allItems = $stmtItems->fetchAll();
 
-            // Group items by order_id
             $itemsByOrder = [];
             foreach ($allItems as $item) {
                 $orderId = $item['order_id'];
-                unset($item['order_id']); // remove order_id from item details
+                unset($item['order_id']);
                 $itemsByOrder[$orderId][] = [
                     'id' => $item['id'],
                     'product_id' => $item['product_id'],
@@ -49,7 +43,6 @@ class OrderController {
                 ];
             }
 
-            // Merge items into orders
             foreach ($orders as &$order) {
                 $orderId = $order['id'];
                 $order['id'] = (int)$order['id'];
@@ -69,15 +62,11 @@ class OrderController {
         }
     }
 
-    /**
-     * GET /orders/{id} - Get a specific order (with items)
-     */
     public function show(int $id) {
         header('Content-Type: application/json');
         try {
             $db = Database::getConnection();
             
-            // Fetch order
             $stmt = $db->prepare("SELECT id, customer_name, created_at FROM orders WHERE id = :id");
             $stmt->execute(['id' => $id]);
             $order = $stmt->fetch();
@@ -88,7 +77,6 @@ class OrderController {
                 return;
             }
 
-            // Fetch items
             $stmtItems = $db->prepare("
                 SELECT oi.id, oi.product_id, p.name as product_name, oi.quantity, oi.price 
                 FROM order_items oi
@@ -125,9 +113,6 @@ class OrderController {
         }
     }
 
-    /**
-     * POST /orders - Create/Place an order (Flash sale handling with pessimistic locking)
-     */
     public function create() {
         header('Content-Type: application/json');
         try {
@@ -136,7 +121,6 @@ class OrderController {
             $customerName = trim($input['customer_name'] ?? '');
             $items = $input['items'] ?? [];
 
-            // Call the transactional service
             $order = $this->orderService->placeOrder($customerName, $items);
 
             http_response_code(201);
@@ -146,25 +130,20 @@ class OrderController {
             ]);
 
         } catch (Exception $e) {
-            // Handle bad request inputs or validation issues
             $code = $e->getCode();
             if ($code < 400 || $code > 500) {
-                $code = 400; // default validation error code
+                $code = 400;
             }
             http_response_code($code);
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
 
-    /**
-     * PUT /orders/{id} - Update an order's metadata (e.g. customer name)
-     */
     public function update(int $id) {
         header('Content-Type: application/json');
         try {
             $db = Database::getConnection();
 
-            // Check if order exists
             $stmt = $db->prepare("SELECT id FROM orders WHERE id = :id");
             $stmt->execute(['id' => $id]);
             if (!$stmt->fetch()) {
@@ -188,7 +167,6 @@ class OrderController {
                 'id' => $id
             ]);
 
-            // Return updated order (excluding items for simplicity, or include them)
             $this->show($id);
 
         } catch (Exception $e) {
@@ -197,15 +175,11 @@ class OrderController {
         }
     }
 
-    /**
-     * DELETE /orders/{id} - Delete an order
-     */
     public function delete(int $id) {
         header('Content-Type: application/json');
         try {
             $db = Database::getConnection();
 
-            // Check if order exists
             $stmt = $db->prepare("SELECT id FROM orders WHERE id = :id");
             $stmt->execute(['id' => $id]);
             if (!$stmt->fetch()) {
@@ -214,7 +188,6 @@ class OrderController {
                 return;
             }
 
-            // Note: foreign keys are set to CASCADE, so deleting the order will delete order items as well.
             $stmtDelete = $db->prepare("DELETE FROM orders WHERE id = :id");
             $stmtDelete->execute(['id' => $id]);
 
