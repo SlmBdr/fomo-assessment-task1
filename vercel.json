@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.7.2"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/docs.html",
+      "destination": "/public/docs.html"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "/public/openapi.json"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.php"
+    }
+  ]
+}
