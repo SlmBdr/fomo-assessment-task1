@@ -1,33 +1,56 @@
 <?php
 
-if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-    require_once __DIR__ . '/../vendor/autoload.php';
-} else {
-    spl_autoload_register(function ($class) {
-        $prefix = 'App\\';
-        $base_dir = __DIR__ . '/../src/';
-        $len = strlen($prefix);
-        if (strncmp($prefix, $class, $len) !== 0) {
-            return;
-        }
-        $relative_class = substr($class, $len);
-        $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-        }
-    });
-}
-
-use App\Database;
-
 echo "=== Concurrency & Race Condition Test ===\n";
 
 try {
-    Database::loadEnv();
-    $db = Database::getConnection();
+    $dbUrl = null;
+    $envPath = __DIR__ . '/../.env';
+    if (file_exists($envPath)) {
+        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            if (strpos(trim($line), '#') === 0) {
+                continue;
+            }
+            if (strpos($line, '=') !== false) {
+                list($key, $value) = explode('=', $line, 2);
+                $key = trim($key);
+                $value = trim($value);
+                if (preg_match('/^"(.*)"$/', $value, $matches)) {
+                    $value = $matches[1];
+                } elseif (preg_match('/^\'(.*)\'$/', $value, $matches)) {
+                    $value = $matches[1];
+                }
+                if ($key === 'DATABASE_URL') {
+                    $dbUrl = $value;
+                }
+            }
+        }
+    }
+
+    if (!$dbUrl) {
+        throw new Exception("DATABASE_URL is not defined in .env file.");
+    }
+
+    $parsed = parse_url($dbUrl);
+    if ($parsed === false || !isset($parsed['host']) || !isset($parsed['path'])) {
+        throw new Exception("Invalid DATABASE_URL format.");
+    }
+
+    $host = $parsed['host'];
+    $port = $parsed['port'] ?? 5432;
+    $dbName = ltrim($parsed['path'], '/');
+    $user = $parsed['user'] ?? '';
+    $pass = $parsed['pass'] ?? '';
+
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbName";
+    
+    $db = new PDO($dsn, $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
 } catch (Exception $e) {
     echo "[ERROR] Database connection failed: " . $e->getMessage() . "\n";
-    echo "Make sure you have configured DATABASE_URL in .env and your database is running.\n";
     exit(1);
 }
 
