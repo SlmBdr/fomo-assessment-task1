@@ -1,22 +1,29 @@
 {
   "version": 2,
-  "functions": {
-    "api/index.php": {
-      "runtime": "vercel-php@0.7.2"
-    }
-  },
-  "rewrites": [
+  "framework": null,
+  "builds": [
     {
-      "source": "/docs.html",
-      "destination": "/public/docs.html"
+      "src": "api/index.php",
+      "use": "vercel-php@0.7.2"
     },
     {
-      "source": "/openapi.json",
-      "destination": "/public/openapi.json"
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/docs.html",
+      "dest": "/public/docs.html"
     },
     {
-      "source": "/(.*)",
-      "destination": "/api/index.php"
+      "src": "/openapi.json",
+      "dest": "/public/openapi.json"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.php"
     }
-  ]
+  ],
+  "outputDirectory": "public"
 }
